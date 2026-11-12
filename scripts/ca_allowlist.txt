@@ -1,0 +1,5 @@
+# UNCONFIRMED: the user must verify these SHA-256 fingerprints against the IT-published corporate root list before
+# running scripts/make_ca_bundle.sh --confirmed. Names alone are not trusted; only exact fingerprints are.
+# Both entries share one key (SKI EF:54:10:11...), self-signed, CA:TRUE, pathlen:1.
+67:93:C7:11:2A:F8:BA:EE:5D:F0:6D:E5:7B:09:AF:35:FD:17:1C:CA:84:3B:F7:A9:C0:65:DC:53:8E:B0:64:3A
+50:40:0A:FB:9C:0F:CB:DA:EE:80:D4:EA:A0:99:31:C8:D1:9B:E5:69:4E:8C:BB:46:FA:D9:71:FF:F6:BE:0D:9D

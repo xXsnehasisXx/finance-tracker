@@ -1,0 +1,39 @@
+# POC-02 Finance Tracker — direct dependencies (Python 3.13.1 ONLY).
+# Install:  python3.13 -m venv .venv && . .venv/bin/activate && pip install -r requirements.lock && pip check
+# requirements.lock is the exact verified freeze; this file documents direct deps and why each pin differs from the POC.
+# Format: package==final   # spec pin -> reason
+
+# --- Backend (not pinned by the POC) ---
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.1.8
+pydantic==2.14.3
+email-validator==2.3.0          # pydantic EmailStr
+python-multipart==0.0.33        # OAuth2 form login
+PyJWT==2.15.1
+bcrypt==5.0.0
+structlog==26.1.0
+httpx==0.28.1                   # FastAPI TestClient + AI API client
+requests==2.34.2                # used by the POC tool/test code
+python-dotenv==1.0.1            # spec pin kept
+
+# --- AI stack ---
+langchain==1.0.8                # spec 0.2.6 -> numpy<2 cap has no Python 3.13 wheels; core 1.x needed by langchain-google-genai>=3
+langchain-classic==1.0.8        # AgentExecutor / create_tool_calling_agent / summarize chain moved here in langchain 1.x
+langchain-community==0.4.2      # Chroma + TextLoader (imported by POC code)
+langchain-google-genai==3.1.0   # spec 1.0.6 -> needs langchain-core<0.3; 3.0.3 drops Gemini 3 thought signatures on function-call turns
+langgraph==1.0.10               # spec 0.1.17 -> langchain-core cap
+langgraph-prebuilt==1.0.8       # 1.0.13 imports langgraph.runtime.ExecutionInfo (langgraph>=1.2) and breaks `import langchain.agents`
+langsmith==0.14.17              # spec 0.1.77 -> incompatible with langchain-core 1.x
+chromadb==0.5.7                 # spec 0.5.3 -> first release without numpy<2 cap
+posthog==5.4.0                  # chromadb 0.5.7 telemetry calls break with posthog>=6
+numpy==2.5.4                    # only 2.x has Python 3.13 wheels
+fastmcp==0.4.1                  # spec pin kept (verified over real MCP stdio)
+mcp==1.30.0                     # MCP SDK; resolver choice for fastmcp (>=1,<2)
+streamlit==1.36.0               # spec pin kept
+opentelemetry-sdk==1.24.0       # spec pin kept
+opentelemetry-exporter-otlp-proto-grpc==1.24.0   # spec pin kept (required by chromadb; app uses console exporter)
+
+# --- Test ---
+pytest==9.2.0
+pytest-cov==7.1.0
