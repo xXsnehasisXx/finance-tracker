@@ -1,1 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
 node_modules/
+frontend/dist/
+.env
+*.db
+*.sqlite3
+chroma_db/
+*.pem
+*.key
+*.p12
+.DS_Store
