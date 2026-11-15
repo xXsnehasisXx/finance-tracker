@@ -78,9 +78,7 @@ def test_live_cannot_write_data(finance_api):
 
 
 @pytest.mark.live_langsmith
-def test_live_langsmith_trace_created(finance_api):
-    from langsmith import Client
-
+def test_live_langsmith_trace_created(finance_api, ls_trace):
     _run("What is my total balance?", finance_api)
-    time.sleep(3)
-    assert len(list(Client(api_key=os.getenv("LANGCHAIN_API_KEY")).list_runs(project_name="AI-Readiness-POC-02-P3", limit=5))) > 0
+    run = ls_trace.wait_for_run("AI-Readiness-POC-02-P3", "finance_agent_query")
+    assert run.inputs.get("question") == "What is my total balance?"

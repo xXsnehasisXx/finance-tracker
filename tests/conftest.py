@@ -13,6 +13,18 @@ engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False}, p
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture
+def ls_trace():
+    """Live LangSmith check: tracing is forced on for this test only, with an explicit client built from the real key."""
+    from langsmith import tracing_context
+
+    from testsupport.langsmith_check import TraceCheck
+
+    check = TraceCheck()
+    with tracing_context(enabled=True, client=check.client):
+        yield check
+
+
 @pytest.fixture(scope="function")
 def db_session():
     import app.models  # noqa: F401

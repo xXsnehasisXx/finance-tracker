@@ -83,6 +83,10 @@ def build_rag_chain(llm=None, embeddings=None, persist_dir: str | None = None, c
     vectorstore = Chroma(persist_directory=persist_dir or CHROMA_DIR, embedding_function=embeddings, collection_name=collection_name)
     if vectorstore._collection.count() == 0:
         raise RuntimeError("The knowledge base is empty. Run `python ai/rag/ingest.py` first.")
+    built_with = (vectorstore._collection.metadata or {}).get("embedding_model")
+    now = str(getattr(embeddings, "model", None) or type(embeddings).__name__)
+    if built_with and built_with != now:
+        raise RuntimeError(f"The knowledge base was built with embedding model '{built_with}' but '{now}' is configured. Re-run `python ai/rag/ingest.py`.")
     return RagChain(vectorstore.as_retriever(search_kwargs={"k": k}), llm)
 
 

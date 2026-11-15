@@ -69,9 +69,9 @@ def _():
         """Use this when you need to ping."""
         return x
 
-    llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"), google_api_key="fake-key")
+    llm = ChatGoogleGenerativeAI(model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"), google_api_key="fake-key")
     llm.bind_tools([ping])
-    GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key="fake-key")
+    GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key="fake-key")
     return "constructed (no network)"
 
 

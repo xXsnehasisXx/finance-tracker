@@ -184,13 +184,14 @@ def report_generator(state: FinancialHealthState, config=None) -> FinancialHealt
     with span("agent.report_generator.activate", **{"agent.name": "report_generator"}):
         spending, budget = state["spending_analysis"], state["budget_analysis"]
         metrics = calc.savings_metrics(spending, state["dashboard_data"])
-        score = calc.health_score(int(budget.get("budget_health_score", 50)), metrics["savings_rate"])
+        breakdown = calc.health_breakdown(int(budget.get("budget_health_score", 50)), metrics["savings_rate"], budget.get("has_budgets", True))
+        score = breakdown["score"]
         summary = None
         if not state["errors"] or spending.get("total_transactions"):
             facts = {"income": metrics["income"], "expenses": metrics["expenses"], "savings_rate": metrics["savings_rate"], "health_score": score,
                      "over_budget": [o.get("category") for o in budget.get("over_budget_categories", [])], "recommendations": state["savings_recommendations"][:3]}
             summary = narrate(ctx, "Report Generator", "Write the executive summary of the month's financial health.", facts)
-        report = render_report(state, metrics, score, summary)
+        report = render_report(state, metrics, breakdown, summary)
         data_failed = spending.get("total_transactions", 0) == 0 and not state["dashboard_data"] and bool(state["errors"])
         status = "error" if data_failed or state["report_status"] == "error" else "complete"
         messages = list(state["messages"]) + [f"Report Generator: Financial health report generated ({len(report)} characters)"]
@@ -198,7 +199,8 @@ def report_generator(state: FinancialHealthState, config=None) -> FinancialHealt
     return {**state, "final_report": report, "report_status": status, "messages": messages}
 
 
-def render_report(state: FinancialHealthState, metrics: dict, score: int, summary: str | None) -> str:
+def render_report(state: FinancialHealthState, metrics: dict, breakdown: dict, summary: str | None) -> str:
+    score = breakdown["score"]
     spending, budget, recs = state["spending_analysis"], state["budget_analysis"], state["savings_recommendations"]
     month, year = state["report_month"], state["report_year"]
     inr, title = calc.inr, calc.title
@@ -276,7 +278,11 @@ def render_report(state: FinancialHealthState, metrics: dict, score: int, summar
     lines.append("")
 
     lines += ["## 8. Financial Health Score", "",
-              f"**{score}/100 — {calc.rating(score)}.** Score = 50% budget health ({budget.get('budget_health_score', 50)}) + 50% savings rate against a 30% target ({metrics['savings_rate']}%)."]
+              f"**{score}/100 — {calc.rating(score)}.**", "",
+              f"- Calculation: {breakdown['formula']}.",
+              f"- {breakdown['savings_note'][0].upper() + breakdown['savings_note'][1:]}."]
+    if breakdown["has_budgets"]:
+        lines.append(f"- Budget health {breakdown['budget_component']} comes from the budget performance section above.")
     if state["errors"]:
         lines += ["", "### Data notes", ""] + [f"- {e}" for e in state["errors"]]
     lines += ["", "---", "*Figures are calculated from your recorded transactions; transfers between your own accounts are excluded. This report is informational, not financial advice.*"]

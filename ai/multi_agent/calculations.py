@@ -231,10 +231,26 @@ def build_recommendations(spending: dict, budget: dict, dashboard: dict | None =
 
 
 # ---------------------------------------------------------------- Report Generator
-def health_score(budget_score: int, rate: float) -> int:
-    """50% budget health + 50% savings rate measured against a 30% target (capped 0-100)."""
-    rate_part = max(0.0, min(100.0, rate / 30 * 100))
-    return int(round(0.5 * budget_score + 0.5 * rate_part))
+SAVINGS_TARGET_PERCENT = 30
+
+
+def health_breakdown(budget_score: int, rate: float, has_budgets: bool = True) -> dict:
+    """Health score = 50% budget health + 50% savings component (savings rate / 30% target, capped at 100).
+    Without budgets there is no budget health to judge, so the savings component alone is the score."""
+    savings_component = int(round(max(0.0, min(100.0, rate / SAVINGS_TARGET_PERCENT * 100))))
+    if has_budgets:
+        score = int(round(0.5 * budget_score + 0.5 * savings_component))
+        formula = f"50% x budget health {budget_score} + 50% x savings component {savings_component} = {score}"
+    else:
+        score = savings_component
+        formula = f"no budgets set, so the savings component alone counts = {score}"
+    note = f"savings component = savings rate {rate}% / {SAVINGS_TARGET_PERCENT}% target, capped at 100"
+    return {"score": score, "budget_component": budget_score if has_budgets else None, "savings_component": savings_component,
+            "has_budgets": has_budgets, "formula": formula, "savings_note": note}
+
+
+def health_score(budget_score: int, rate: float, has_budgets: bool = True) -> int:
+    return health_breakdown(budget_score, rate, has_budgets)["score"]
 
 
 def rating(score: int) -> str:

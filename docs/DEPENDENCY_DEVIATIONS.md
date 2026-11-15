@@ -21,10 +21,10 @@ All other POC pins are kept. Evidence: `scripts/verify/*.py` (run from the proje
 | mcp (MCP SDK) | - | 1.30.0 | transitive of fastmcp 0.4.1 |
 
 ## Other deviations
-- **Gemini model:** POC says Gemini 2.0 Flash, which Google has shut down. `GEMINI_MODEL` (env, default `gemini-3.6-flash`) replaces it. Provider unchanged. External API lifecycle compatibility change. **Not yet verified live (no `GOOGLE_API_KEY`).**
+- **Gemini models:** POC says Gemini 2.0 Flash (shut down by Google) and `text-embedding-004` (404 on the current API). Defaults are now `GEMINI_MODEL=gemini-3.5-flash-lite` and `EMBEDDING_MODEL=models/gemini-embedding-001` — the ids confirmed working with the project's Gemini key on the developer's personal laptop. They are defined once in `ai/common/llm.py`; stale values of the retired ids in an old `.env` are replaced by the defaults (with a warning). Provider unchanged. External API lifecycle compatibility change. **Not executed live from the office laptop** (see below). The spec files in `extras/` still mention `text-embedding-004`; they are reference material and were not modified. A ChromaDB index records its embedding model; after changing `EMBEDDING_MODEL` re-run `python ai/rag/ingest.py`.
 - **OpenTelemetry:** `opentelemetry-instrumentation-fastapi` is installed transitively but unusable (`pkg_resources`); manual spans (SDK + console exporter) are used.
 - **Added supporting packages:** PyJWT, bcrypt, python-multipart, email-validator, structlog, httpx, requests, pytest-cov (required by the POC specs).
 - **Frontend supporting packages:** react-router-dom (navigation), recharts (POC-named).
 
 ## Live verification status
-Live Gemini checks (`scripts/verify/verify_gemini_compat.py`) are **SKIPPED** until `GOOGLE_API_KEY` is provided.
+Live Gemini / LangSmith checks (`pytest -m "live_gemini or live_langsmith"`, `scripts/verify/verify_gemini_compat.py`) are **SKIPPED** wherever no key is configured and are never counted as passed. They were demonstrated by the developer on a personal laptop; they cannot run from the office laptop (corporate TLS interception, no keys).

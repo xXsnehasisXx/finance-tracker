@@ -19,6 +19,10 @@ MANUAL_PATH = os.getenv("MANUAL_PATH", os.path.join(os.path.dirname(os.path.absp
 CHROMA_DIR = os.getenv("CHROMA_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "chroma_db")))
 COLLECTION_NAME = "finance_manual"
 CHUNK_SIZE, CHUNK_OVERLAP = 512, 50
+
+
+def embedding_model_id(embeddings) -> str:
+    return str(getattr(embeddings, "model", None) or type(embeddings).__name__)
 _HEADING = re.compile(r"^#### (Section \d+: .+)$", re.M)
 
 
@@ -67,13 +71,16 @@ def ingest_manual(embeddings=None, persist_dir: str | None = None, manual_path: 
 
         embeddings = get_embeddings()
 
-    with span("rag.embed", **{"rag.embedding_model": getattr(embeddings, "model", type(embeddings).__name__)}) as sp:
+    with span("rag.embed", **{"rag.embedding_model": embedding_model_id(embeddings)}) as sp:
         client = chromadb.PersistentClient(path=persist_dir, settings=Settings(anonymized_telemetry=False))
         try:
             client.delete_collection(collection_name)
         except Exception:  # noqa: BLE001  (collection did not exist)
             pass
-        Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=persist_dir, collection_name=collection_name)
+        Chroma.from_documents(
+            documents=chunks, embedding=embeddings, persist_directory=persist_dir, collection_name=collection_name,
+            collection_metadata={"embedding_model": embedding_model_id(embeddings)},
+        )
         sp.set_attribute("vectors_stored", len(chunks))
 
     logger.info(

@@ -1,7 +1,7 @@
 """Gemini chat/embedding factories. Models come from the environment; nothing model-specific is hard-coded.
 
-GEMINI_MODEL      chat model id (POC says Gemini 2.0 Flash, shut down by Google; default gemini-3.6-flash)
-EMBEDDING_MODEL   embeddings model id (default models/text-embedding-004)
+GEMINI_MODEL      chat model id (POC says Gemini 2.0 Flash, shut down by Google; default gemini-3.5-flash-lite)
+EMBEDDING_MODEL   embeddings model id (default models/gemini-embedding-001)
 GOOGLE_API_KEY    required for live calls (never logged)
 """
 import os
@@ -10,8 +10,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_CHAT_MODEL = "gemini-3.6-flash"
-DEFAULT_EMBEDDING_MODEL = "models/text-embedding-004"
+DEFAULT_CHAT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-001"
+
+# Ids that do not work with the project's API access. A stale value left in an old .env would otherwise override the
+# default and fail with "404 ... not found"; it is replaced by the default and a warning is logged.
+RETIRED_MODELS = {
+    "GEMINI_MODEL": {"gemini-3.6-flash": DEFAULT_CHAT_MODEL, "gemini-2.0-flash": DEFAULT_CHAT_MODEL},
+    "EMBEDDING_MODEL": {"models/text-embedding-004": DEFAULT_EMBEDDING_MODEL, "text-embedding-004": DEFAULT_EMBEDDING_MODEL},
+}
 
 
 class MissingApiKeyError(RuntimeError):
@@ -25,12 +32,23 @@ def _api_key() -> str:
     return key
 
 
+def _model_from_env(var: str, default: str) -> str:
+    value = (os.getenv(var) or "").strip() or default
+    replacement = RETIRED_MODELS[var].get(value)
+    if replacement:
+        from common.observability import get_logger
+
+        get_logger("llm").warning("retired_model_id_replaced", variable=var, configured=value, using=replacement)
+        return replacement
+    return value
+
+
 def chat_model_name() -> str:
-    return os.getenv("GEMINI_MODEL", DEFAULT_CHAT_MODEL)
+    return _model_from_env("GEMINI_MODEL", DEFAULT_CHAT_MODEL)
 
 
 def embedding_model_name() -> str:
-    return os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+    return _model_from_env("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
 
 
 def get_chat_model(temperature: float = 0.1):

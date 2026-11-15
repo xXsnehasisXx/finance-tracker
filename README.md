@@ -46,7 +46,7 @@ Gemini only adds short commentary, which is discarded if it contains numbers not
 ```bash
 .venv/bin/python -m pytest tests -q                 # mock tier runs; live tier is skipped without keys
 .venv/bin/python -m pytest tests/phase1 -q          # per phase: phase1 … phase5
-.venv/bin/python -m pytest -m live_gemini -v        # LIVE Gemini tests (needs GOOGLE_API_KEY)
+.venv/bin/python -m pytest -m "live_gemini or live_langsmith" -v   # LIVE tests (need GOOGLE_API_KEY / LANGCHAIN_API_KEY)
 .venv/bin/python scripts/verify/verify_gemini_compat.py   # live Gemini compatibility script (needs GOOGLE_API_KEY)
 ```
 
@@ -55,12 +55,26 @@ The pytest summary prints **mock** and **live** results separately. A skipped li
 TC-API-08 (spec dashboard test) assumes June 2026. The repo-root `conftest.py` freezes the clock to 2026-06-18 for
 `tests/phase1/` only; production always uses the real current month.
 
-## Corporate TLS interception (optional)
+## Configure credentials
 
-pip and the REST/MCP parts work without changes. gRPC (Gemini) may need the corporate root CA:
-`scripts/ca_allowlist.txt` lists the allowed SHA-256 fingerprints; after confirming them with IT run
-`scripts/make_ca_bundle.sh --confirmed` (creates `~/.config/finance-tracker/ca-bundle.pem`, outside the repo), then
-`source scripts/dev_env.sh`. SSL verification is never disabled.
+Edit `.env` (git-ignored; never commit it). Keys are optional: without them the app, the offline tests and the report CLI still work.
+
+```
+GOOGLE_API_KEY=<your Gemini key>
+GEMINI_MODEL=gemini-3.5-flash-lite
+EMBEDDING_MODEL=models/gemini-embedding-001
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=<your LangSmith key>
+```
+
+An older `.env` that still names `text-embedding-004` or `gemini-3.6-flash` is corrected automatically (with a log warning), but update it. After changing `EMBEDDING_MODEL`, rebuild the index: `.venv/bin/python ai/rag/ingest.py`.
+LangSmith projects used: `AI-Readiness-POC-02-P2` (RAG), `-P3` (agent), `-P4` (MCP chat), `-P5` (report).
+
+## Corporate TLS interception (environment-specific, optional)
+
+On a network that intercepts TLS, Gemini (gRPC) calls can fail with `CERTIFICATE_VERIFY_FAILED`. That is a network/trust
+issue, not an application defect; run the live checks from a network without interception. SSL verification is never disabled
+by this project. (`scripts/make_ca_bundle.sh` / `scripts/ca_allowlist.txt` are optional helpers for those who have IT-approved roots.)
 
 ## Layout
 

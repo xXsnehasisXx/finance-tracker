@@ -74,10 +74,7 @@ def test_live_latency_reasonable(live_chain):
 
 
 @pytest.mark.live_langsmith
-def test_live_langsmith_trace_created(live_chain):
-    from langsmith import Client
-
+def test_live_langsmith_trace_created(live_chain, ls_trace):
     ask_question("How do I set a monthly budget?", live_chain)
-    time.sleep(3)
-    runs = list(Client(api_key=os.getenv("LANGCHAIN_API_KEY")).list_runs(project_name="AI-Readiness-POC-02-P2", limit=5))
-    assert len(runs) > 0
+    run = ls_trace.wait_for_run("AI-Readiness-POC-02-P2", "finance_rag_query")
+    assert run.inputs.get("question") == "How do I set a monthly budget?"

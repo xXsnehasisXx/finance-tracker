@@ -7,8 +7,8 @@ Two tiers, reported separately and never conflated:
 
 Configuration (environment only; nothing model-specific is hard-coded):
   GOOGLE_API_KEY        required for LIVE tier (never printed)
-  GEMINI_MODEL          chat model id           (default: gemini-3.6-flash)
-  EMBEDDING_MODEL       embeddings model id     (default: models/text-embedding-004)
+  GEMINI_MODEL          chat model id           (default: gemini-3.5-flash-lite)
+  EMBEDDING_MODEL       embeddings model id     (default: models/gemini-embedding-001)
   GEMINI_FALLBACK_MODEL optional second chat model to try if GEMINI_MODEL fails L1
 
 Exit codes: 0 = everything that ran passed AND live tier ran; 3 = offline passed but live NOT verified (no key);
@@ -23,8 +23,8 @@ import warnings
 warnings.filterwarnings("ignore")
 os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-EMBED = os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+EMBED = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
 FALLBACK = os.getenv("GEMINI_FALLBACK_MODEL", "")
 KEY = os.getenv("GOOGLE_API_KEY", "")
 ROWS = []  # (tier, name, status, detail)

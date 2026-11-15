@@ -50,8 +50,28 @@ def get_logger(name: str, phase: int | None = None):
     return structlog.get_logger(name, phase=phase) if phase is not None else structlog.get_logger(name)
 
 
+def langsmith_api_key() -> str:
+    """LangSmith accepts LANGCHAIN_* (canonical in this project) and the newer LANGSMITH_* names; both are honoured."""
+    return os.getenv("LANGCHAIN_API_KEY") or os.getenv("LANGSMITH_API_KEY") or ""
+
+
+def langsmith_requested() -> bool:
+    return (os.getenv("LANGCHAIN_TRACING_V2") or os.getenv("LANGSMITH_TRACING") or "false").lower() == "true"
+
+
 def langsmith_enabled() -> bool:
-    return os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true" and bool(os.getenv("LANGCHAIN_API_KEY"))
+    return langsmith_requested() and bool(langsmith_api_key())
+
+
+def configure_tracing() -> None:
+    """Tracing on without a key would make every traced call log auth errors; switch it off instead (app keeps working)."""
+    if langsmith_requested() and not langsmith_api_key():
+        os.environ["LANGCHAIN_TRACING_V2"] = "false"
+        os.environ["LANGSMITH_TRACING"] = "false"
+        print('{"event": "langsmith_tracing_disabled", "reason": "no LANGCHAIN_API_KEY set"}', file=sys.stderr)
+
+
+configure_tracing()
 
 
 def traceable_if_enabled(**kwargs):

@@ -140,6 +140,38 @@ def test_health_score_bounds_and_rating():
     assert [calc.rating(s) for s in (90, 65, 45, 10)] == ["Excellent", "Good", "Fair", "Needs attention"]
 
 
+def test_health_breakdown_exposes_every_component():
+    # Regression: a report showed "75/100" with only "budget 50, savings rate 78.5%" visible. The savings component is capped
+    # at 100 (78.5% vs a 30% target), which was not shown; the breakdown now states every input of the formula.
+    b = calc.health_breakdown(50, 78.5, has_budgets=True)
+    assert (b["score"], b["budget_component"], b["savings_component"]) == (75, 50, 100)
+    assert b["formula"] == "50% x budget health 50 + 50% x savings component 100 = 75" and "78.5% / 30% target, capped at 100" in b["savings_note"]
+    none = calc.health_breakdown(50, 78.5, has_budgets=False)  # no budgets: no neutral "50" is invented
+    assert (none["score"], none["budget_component"]) == (100, None) and "no budgets set" in none["formula"]
+    assert calc.health_breakdown(80, 15)["savings_component"] == 50 and calc.health_breakdown(80, 15)["score"] == 65
+
+
+@pytest.mark.parametrize("has_budgets", [True, False])
+@pytest.mark.parametrize("budget_score,rate", [(100, 31.25), (50, 78.5), (73, 12.0), (0, -20.0), (90, 0.0), (65, 29.99)])
+def test_report_score_always_matches_its_displayed_formula(budget_score, rate, has_budgets):
+    import re
+
+    income, spent = 100000.0, round(100000.0 * (1 - rate / 100), 2)
+    state = {**initial_state(1, 6, 2026), "spending_analysis": {"total_spent": spent, "total_income": income, "spending_by_category": {}},
+             "budget_analysis": {"budget_health_score": budget_score, "has_budgets": has_budgets, "over_budget_categories": [], "recommendations": []},
+             "savings_recommendations": []}
+    section = report_generator(state, {"configurable": {"report_ctx": ReportContext(use_llm=False)}})["final_report"].split("## 8. Financial Health Score")[1]
+    shown = int(re.search(r"\*\*(\d+)/100", section).group(1))
+    expected_savings = round(max(0.0, min(100.0, calc.savings_rate(income, spent) / 30 * 100)))
+    if has_budgets:
+        m = re.search(r"50% x budget health (\d+) \+ 50% x savings component (\d+) = (\d+)", section)
+        assert (int(m.group(1)), int(m.group(2))) == (budget_score, expected_savings)
+        assert int(m.group(3)) == shown == round(0.5 * budget_score + 0.5 * expected_savings)
+    else:
+        assert int(re.search(r"alone counts = (\d+)", section).group(1)) == shown == expected_savings
+        assert "50% x budget health" not in section
+
+
 def test_analyze_transactions_excludes_transfers_and_flags_patterns():
     tx = [{"id": 1, "type": "debit", "category": "food", "amount": 9000.0, "description": "Party", "merchant": "Zomato", "transaction_date": "2026-10-03", "is_transfer": False},
           {"id": 2, "type": "debit", "category": "food", "amount": 500.0, "description": "Lunch", "merchant": "Zomato", "transaction_date": "2026-10-04", "is_transfer": False},

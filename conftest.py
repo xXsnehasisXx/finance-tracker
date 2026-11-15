@@ -17,12 +17,38 @@ os.environ.setdefault("SECRET_KEY", "test-only-secret-key-not-for-production-012
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGSMITH_TRACING"] = "false"
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests"))
+# Credentials/model ids a developer keeps in .env (git-ignored). They are read WITHOUT being exported globally: live tests
+# receive them through the fixture below, mock tests never see a real key, so the offline tier cannot reach the network.
+ROOT = os.path.dirname(os.path.abspath(__file__))
+LIVE_ENV_KEYS = ("GOOGLE_API_KEY", "LANGCHAIN_API_KEY", "LANGSMITH_API_KEY", "GEMINI_MODEL", "EMBEDDING_MODEL")
+try:
+    from dotenv import dotenv_values
+
+    _dotenv = dotenv_values(os.path.join(ROOT, ".env"))
+except ImportError:  # pragma: no cover
+    _dotenv = {}
+LIVE_ENV = {k: v for k in LIVE_ENV_KEYS if (v := os.environ.get(k) or _dotenv.get(k))}
+
+sys.path.insert(0, os.path.join(ROOT, "tests"))
 
 import pytest  # noqa: E402
 
 SPEC_TODAY = datetime.date(2026, 6, 18)
+
+
+@pytest.fixture(autouse=True)
+def _credentials_by_tier(request, monkeypatch):
+    """Mock tier: no real keys, tracing off (guaranteed offline). Live tier: keys from env/.env; tracing stays off unless
+    the test is live_langsmith (the ls_trace fixture then enables it explicitly)."""
+    for k in LIVE_ENV_KEYS:
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    if "live_gemini" in request.keywords or "live_langsmith" in request.keywords:
+        for k, v in LIVE_ENV.items():
+            monkeypatch.setenv(k, v)
 
 
 @pytest.fixture(autouse=True)
@@ -39,9 +65,9 @@ def pytest_collection_modifyitems(config, items):
     skip_gemini = pytest.mark.skip(reason="SKIPPED(no GOOGLE_API_KEY): live Gemini verification pending")
     skip_smith = pytest.mark.skip(reason="SKIPPED(no LANGCHAIN_API_KEY): live LangSmith verification pending")
     for item in items:
-        if "live_gemini" in item.keywords and not os.getenv("GOOGLE_API_KEY"):
+        if "live_gemini" in item.keywords and not LIVE_ENV.get("GOOGLE_API_KEY"):
             item.add_marker(skip_gemini)
-        if "live_langsmith" in item.keywords and not os.getenv("LANGCHAIN_API_KEY"):
+        if "live_langsmith" in item.keywords and not (LIVE_ENV.get("LANGCHAIN_API_KEY") or LIVE_ENV.get("LANGSMITH_API_KEY")):
             item.add_marker(skip_smith)
 
 
@@ -56,7 +82,7 @@ def pytest_terminal_summary(terminalreporter):
     for rep in tr.stats.get("passed", []):
         if rep.when == "call":
             tiers[bucket(rep)][0] += 1
-    for rep in tr.stats.get("failed", []):
+    for rep in tr.stats.get("failed", []) + tr.stats.get("error", []):
         tiers[bucket(rep)][1] += 1
     for rep in tr.stats.get("skipped", []):
         tiers[bucket(rep)][2] += 1

@@ -72,11 +72,8 @@ def test_live_multi_turn_context(live):
 
 
 @pytest.mark.live_langsmith
-def test_live_langsmith_trace_has_session(live):
-    from langsmith import Client
-
+def test_live_langsmith_trace_has_session(live, ls_trace):
     user, acct, ex = live
     process_message("Show my financial dashboard", "obs-trace-002", ex)
-    time.sleep(3)
-    runs = list(Client(api_key=os.getenv("LANGCHAIN_API_KEY")).list_runs(project_name="AI-Readiness-POC-02-P4", limit=5))
-    assert runs and runs[0].name
+    run = ls_trace.wait_for_run("AI-Readiness-POC-02-P4", "finance_chat_message")
+    assert run.inputs.get("session_id") == "obs-trace-002"
