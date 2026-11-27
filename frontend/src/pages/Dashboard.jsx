@@ -1,12 +1,29 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link as RouterLink } from 'react-router-dom'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Grid from '@mui/material/Grid'
+import Stack from '@mui/material/Stack'
+import Typography from '@mui/material/Typography'
+import AccountBalanceWalletRounded from '@mui/icons-material/AccountBalanceWalletRounded'
+import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded'
+import PieChartRounded from '@mui/icons-material/PieChartRounded'
+import PercentRounded from '@mui/icons-material/PercentRounded'
+import ReceiptLongRounded from '@mui/icons-material/ReceiptLongRounded'
+import SavingsRounded from '@mui/icons-material/SavingsRounded'
+import SwapVertRounded from '@mui/icons-material/SwapVertRounded'
+import TrendingDownRounded from '@mui/icons-material/TrendingDownRounded'
+import TrendingUpRounded from '@mui/icons-material/TrendingUpRounded'
 import { api } from '../services/api.js'
 import { useAsync } from '../hooks/useAsync.js'
-import { Card, EmptyState, ErrorState, PeriodPicker, Spinner, StatCard } from '../components/ui.jsx'
+import { CategoryDot, EmptyState, ErrorState, PageHeader, PeriodPicker, SectionCard, Spinner, StatCard } from '../components/ui.jsx'
 import { CategoryPieChart, IncomeExpenseBarChart } from '../components/charts/index.jsx'
 import BudgetBar from '../components/BudgetBar.jsx'
 import TransactionTable from '../components/TransactionTable.jsx'
-import { MONTHS, formatINR, formatPercent } from '../utils/format.js'
+import { MONTHS, formatINR, formatPercent, titleCase } from '../utils/format.js'
+
+const twoUp = { display: 'grid', gap: 3, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' }, mb: 3 }
 
 export default function Dashboard() {
   const now = new Date()
@@ -17,10 +34,8 @@ export default function Dashboard() {
   const accounts = useAsync(() => api.accounts(), [])
 
   const header = (
-    <div className="page-head">
-      <h1>Dashboard</h1>
-      <PeriodPicker month={period.month} year={period.year} months={MONTHS} onChange={(month, year) => setPeriod({ month, year })} />
-    </div>
+    <PageHeader title="Dashboard" subtitle="Your financial overview"
+      actions={<PeriodPicker month={period.month} year={period.year} months={MONTHS} onChange={(month, year) => setPeriod({ month, year })} />} />
   )
   if (dash.loading && !dash.data) return <>{header}<Spinner /></>
   if (dash.error) return <>{header}<ErrorState error={dash.error} onRetry={dash.reload} /></>
@@ -32,45 +47,67 @@ export default function Dashboard() {
     <>
       {header}
       {d.budget_alerts_count > 0 && (
-        <div className="banner banner-warn">🔔 {d.budget_alerts_count} budget alert{d.budget_alerts_count > 1 ? 's' : ''} this period. <Link to="/budgets">Review budgets</Link></div>
+        <Alert severity="warning" sx={{ mb: 3 }}
+          action={<Button color="inherit" size="small" sx={{ whiteSpace: 'nowrap' }} component={RouterLink} to="/budgets" endIcon={<ArrowForwardRounded />}>Review budgets</Button>}>
+          {d.budget_alerts_count} budget alert{d.budget_alerts_count > 1 ? 's' : ''} this period.
+        </Alert>
       )}
-      <div className="stats">
-        <StatCard label="Net balance" value={formatINR(d.total_balance)} sub={`Assets ${formatINR(d.total_assets)} · Credit owed ${formatINR(d.total_liabilities)}`} />
-        <StatCard label="Income" value={formatINR(d.monthly_income)} tone="good" sub={`${MONTHS[d.month - 1]} ${d.year}`} />
-        <StatCard label="Expenses" value={formatINR(d.monthly_expenses)} tone="bad" sub="Excludes transfers" />
-        <StatCard label="Net cash flow" value={formatINR(d.net_cash_flow)} tone={d.net_cash_flow < 0 ? 'bad' : 'good'} />
-        <StatCard label="Savings rate" value={formatPercent(d.savings_rate)} tone={rateTone} sub="(income − expenses) ÷ income" />
-      </div>
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+          <StatCard label="Net balance" icon={<AccountBalanceWalletRounded />} value={formatINR(d.total_balance)} sub={`Assets ${formatINR(d.total_assets)} · Credit owed ${formatINR(d.total_liabilities)}`} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard label="Income" icon={<TrendingUpRounded />} value={formatINR(d.monthly_income)} tone="good" sub={`${MONTHS[d.month - 1]} ${d.year}`} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard label="Expenses" icon={<TrendingDownRounded />} value={formatINR(d.monthly_expenses)} tone="bad" sub="Excludes transfers" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 6 }}>
+          <StatCard label="Net cash flow" icon={<SwapVertRounded />} value={formatINR(d.net_cash_flow)} tone={d.net_cash_flow < 0 ? 'bad' : 'good'} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 12, lg: 6 }}>
+          <StatCard label="Savings rate" icon={<PercentRounded />} value={formatPercent(d.savings_rate)} tone={rateTone} sub="(income − expenses) ÷ income" />
+        </Grid>
+      </Grid>
 
-      <div className="grid-2">
-        <Card title="Income vs expenses (6 months)">
+      <Box sx={twoUp}>
+        <SectionCard title="Income vs expenses (6 months)">
           {trend.loading ? <Spinner /> : trend.error ? <ErrorState error={trend.error} onRetry={trend.reload} /> : <IncomeExpenseBarChart data={trend.data} />}
-        </Card>
-        <Card title="Spending by category">
+        </SectionCard>
+        <SectionCard title="Spending by category">
           {cats.loading ? <Spinner /> : cats.error ? <ErrorState error={cats.error} onRetry={cats.reload} />
-            : cats.data.length === 0 ? <EmptyState icon="🥧" title="No spending this month">Add an expense to see your breakdown.</EmptyState>
+            : cats.data.length === 0 ? <EmptyState icon={<PieChartRounded />} title="No spending this month">Add an expense to see your breakdown.</EmptyState>
             : <CategoryPieChart data={cats.data} />}
-        </Card>
-      </div>
+        </SectionCard>
+      </Box>
 
-      <div className="grid-2">
-        <Card title="Budget utilization" actions={<Link to="/budgets" className="link-btn">Manage</Link>}>
+      <Box sx={twoUp}>
+        <SectionCard title="Budget utilization" actions={<Button size="small" component={RouterLink} to="/budgets" endIcon={<ArrowForwardRounded />}>Manage</Button>}>
           {d.budget_utilization.length === 0
-            ? <EmptyState icon="🎯" title="No budgets for this month"><Link to="/budgets">Set a monthly budget</Link></EmptyState>
+            ? <EmptyState icon={<SavingsRounded />} title="No budgets for this month" action={<Button component={RouterLink} to="/budgets">Set a monthly budget</Button>} />
             : d.budget_utilization.map((b) => <BudgetBar key={b.category} category={b.category} limit={b.monthly_limit} spent={b.spent} percent={b.utilization_percent} hasAlert={b.has_alert} />)}
-        </Card>
-        <Card title="Top spending categories">
-          {d.top_3_categories.length === 0 ? <EmptyState icon="📉" title="Nothing yet" /> : (
-            <ol className="rank">{d.top_3_categories.map((c) => <li key={c.category}><span className={`dot dot-${c.category}`} />{c.category}<strong>{formatINR(c.amount)}</strong></li>)}</ol>
+        </SectionCard>
+        <SectionCard title="Top spending categories">
+          {d.top_3_categories.length === 0 ? <EmptyState icon={<TrendingDownRounded />} title="Nothing yet" /> : (
+            <Stack component="ol" spacing={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+              {d.top_3_categories.map((c, i) => (
+                <Stack component="li" key={c.category} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ width: 18 }}>{i + 1}</Typography>
+                  <CategoryDot category={c.category} />
+                  <Typography>{titleCase(c.category)}</Typography>
+                  <Typography sx={{ ml: 'auto', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatINR(c.amount)}</Typography>
+                </Stack>
+              ))}
+            </Stack>
           )}
-        </Card>
-      </div>
+        </SectionCard>
+      </Box>
 
-      <Card title="Recent transactions" actions={<Link to="/transactions" className="link-btn">View all</Link>}>
+      <SectionCard title="Recent transactions" actions={<Button size="small" component={RouterLink} to="/transactions" endIcon={<ArrowForwardRounded />}>View all</Button>}>
         {d.recent_transactions.length === 0
-          ? <EmptyState title="No transactions yet"><Link to="/transactions">Add your first transaction</Link></EmptyState>
+          ? <EmptyState icon={<ReceiptLongRounded />} title="No transactions yet" action={<Button component={RouterLink} to="/transactions">Add your first transaction</Button>} />
           : <TransactionTable items={d.recent_transactions} accountNames={names} />}
-      </Card>
+      </SectionCard>
     </>
   )
 }

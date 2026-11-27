@@ -20,9 +20,3 @@ export const todayISO = () => {
 }
 
 export const utilizationTone = (pct) => (pct >= 100 ? 'danger' : pct >= 80 ? 'warn' : 'ok')
-
-// Same colours everywhere for a category
-export const CATEGORY_COLORS = {
-  food: '#f97316', transport: '#3b82f6', utilities: '#8b5cf6', entertainment: '#ec4899',
-  health: '#10b981', salary: '#14b8a6', other: '#64748b',
-}

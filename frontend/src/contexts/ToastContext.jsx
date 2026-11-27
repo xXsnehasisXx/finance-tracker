@@ -1,33 +1,49 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 
 const ToastContext = createContext(null)
-let nextId = 1
 
+// Shows one notification at a time; extra ones are queued so none are lost.
 export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([])
+  const [queue, setQueue] = useState([])
+  const [open, setOpen] = useState(false)
+  const nextId = useRef(1)
+  const current = queue[0]
 
-  const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), [])
   const push = useCallback((kind, message) => {
-    const id = nextId++
-    setToasts((t) => [...t, { id, kind, message }])
-    setTimeout(() => dismiss(id), 4500)
-  }, [dismiss])
+    setQueue((q) => [...q, { id: nextId.current++, kind, message }])
+    setOpen(true)
+  }, [])
 
-  const api = useMemo(() => ({
-    success: (m) => push('success', m),
-    error: (m) => push('error', m),
-  }), [push])
+  const handleClose = (_, reason) => {
+    if (reason === 'clickaway') return
+    setOpen(false)
+  }
+  const handleExited = () => {
+    setQueue((q) => q.slice(1))
+    setOpen(true)
+  }
+
+  const api = useMemo(() => ({ success: (m) => push('success', m), error: (m) => push('error', m) }), [push])
 
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.kind}`} onClick={() => dismiss(t.id)}>
-            <span>{t.kind === 'success' ? '✓' : '⚠'}</span> {t.message}
-          </div>
-        ))}
-      </div>
+      <Snackbar
+        key={current?.id}
+        open={open && Boolean(current)}
+        autoHideDuration={4500}
+        onClose={handleClose}
+        slotProps={{ transition: { onExited: handleExited } }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        {current ? (
+          <Alert severity={current.kind} variant="filled" onClose={handleClose} sx={{ width: '100%', boxShadow: 6 }}>
+            {current.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </ToastContext.Provider>
   )
 }
