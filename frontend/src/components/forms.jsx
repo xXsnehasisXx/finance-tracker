@@ -1,6 +1,14 @@
 import { useState } from 'react'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import CircularProgress from '@mui/material/CircularProgress'
+import MenuItem from '@mui/material/MenuItem'
+import Stack from '@mui/material/Stack'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
+import InputAdornment from '@mui/material/InputAdornment'
 import { ACCOUNT_TYPES, BUDGET_CATEGORIES, CATEGORIES, MONTHS, formatINR, titleCase, todayISO } from '../utils/format.js'
-import { Field } from './ui.jsx'
 
 const MONEY = /^\d+(\.\d{1,2})?$/
 
@@ -26,20 +34,37 @@ function useForm(initial, validate, onSubmit) {
       setBusy(false)
     }
   }
-  return { values, errors, busy, formError, set, submit }
+  // Props shared by every field: value, change handler, and error/hint presentation.
+  const field = (name, hint) => ({
+    name,
+    value: values[name],
+    onChange: set(name),
+    error: Boolean(errors[name]),
+    helperText: errors[name] || hint || ' ',
+  })
+  return { values, errors, busy, formError, field, submit }
 }
 
-function Actions({ busy, onCancel, label }) {
+export const rupeeAdornment = { input: { startAdornment: <InputAdornment position="start">₹</InputAdornment> } }
+
+export function FormActions({ busy, onCancel, label }) {
   return (
-    <div className="form-actions">
-      <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-      <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : label}</button>
-    </div>
+    <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'flex-end', pt: 1 }}>
+      <Button type="button" color="inherit" onClick={onCancel} disabled={busy}>Cancel</Button>
+      <Button type="submit" variant="contained" disabled={busy} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}>
+        {busy ? 'Saving…' : label}
+      </Button>
+    </Stack>
   )
 }
 
-const FormError = ({ message }) => (message ? <div className="form-error" role="alert">{message}</div> : null)
+const FormError = ({ message }) => (message ? <Alert severity="error" role="alert" sx={{ mb: 2 }}>{message}</Alert> : null)
+const FormBody = ({ children, ...props }) => <Box component="form" noValidate {...props} sx={{ display: 'grid', gap: 0.5, pt: 0.5 }}>{children}</Box>
+const Row = ({ children }) => <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>{children}</Box>
 const amountError = (v) => (!v ? 'Amount is required' : !MONEY.test(v) || Number(v) <= 0 ? 'Enter an amount greater than 0 (max 2 decimals)' : '')
+const dateField = { inputLabel: { shrink: true } }
+
+const options = (list) => list.map((t) => <MenuItem key={t} value={t}>{titleCase(t)}</MenuItem>)
 
 export function AccountForm({ onSubmit, onCancel }) {
   const f = useForm({ account_name: '', account_type: 'savings', balance: '0' },
@@ -49,26 +74,24 @@ export function AccountForm({ onSubmit, onCancel }) {
     }),
     (v) => onSubmit({ account_name: v.account_name.trim(), account_type: v.account_type, balance: Number(v.balance) }))
   return (
-    <form onSubmit={f.submit} noValidate>
+    <FormBody onSubmit={f.submit}>
       <FormError message={f.formError} />
-      <Field label="Account name" error={f.errors.account_name}><input value={f.values.account_name} onChange={f.set('account_name')} placeholder="e.g. HDFC Savings" autoFocus /></Field>
-      <Field label="Account type"><select value={f.values.account_type} onChange={f.set('account_type')}>{ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</select></Field>
-      <Field label={f.values.account_type === 'credit' ? 'Outstanding amount owed (₹)' : 'Initial balance (₹)'} error={f.errors.balance}>
-        <input inputMode="decimal" value={f.values.balance} onChange={f.set('balance')} />
-      </Field>
-      <Actions busy={f.busy} onCancel={onCancel} label="Create account" />
-    </form>
+      <TextField label="Account name" placeholder="e.g. HDFC Savings" autoFocus {...f.field('account_name')} />
+      <TextField select label="Account type" {...f.field('account_type')}>{options(ACCOUNT_TYPES)}</TextField>
+      <TextField label={f.values.account_type === 'credit' ? 'Outstanding amount owed' : 'Initial balance'} slotProps={{ ...rupeeAdornment, htmlInput: { inputMode: 'decimal' } }} {...f.field('balance')} />
+      <FormActions busy={f.busy} onCancel={onCancel} label="Create account" />
+    </FormBody>
   )
 }
 
 export function RenameForm({ account, onSubmit, onCancel }) {
   const f = useForm({ account_name: account.account_name }, (v) => (v.account_name.trim() ? {} : { account_name: 'Account name is required' }), (v) => onSubmit(v.account_name.trim()))
   return (
-    <form onSubmit={f.submit} noValidate>
+    <FormBody onSubmit={f.submit}>
       <FormError message={f.formError} />
-      <Field label="Account name" error={f.errors.account_name} hint="The account type cannot be changed."><input value={f.values.account_name} onChange={f.set('account_name')} autoFocus /></Field>
-      <Actions busy={f.busy} onCancel={onCancel} label="Save" />
-    </form>
+      <TextField label="Account name" autoFocus {...f.field('account_name', 'The account type cannot be changed.')} />
+      <FormActions busy={f.busy} onCancel={onCancel} label="Save" />
+    </FormBody>
   )
 }
 
@@ -88,25 +111,28 @@ export function TransactionForm({ accounts, onSubmit, onCancel, defaults = {} })
     }),
   )
   return (
-    <form onSubmit={f.submit} noValidate>
+    <FormBody onSubmit={f.submit}>
       <FormError message={f.formError} />
-      <div className="form-row">
-        <Field label="Type"><select value={f.values.type} onChange={f.set('type')}><option value="debit">Expense (debit)</option><option value="credit">Income (credit)</option></select></Field>
-        <Field label="Account" error={f.errors.account_id}>
-          <select value={f.values.account_id} onChange={f.set('account_id')}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.account_name} ({a.account_type})</option>)}</select>
-        </Field>
-      </div>
-      <div className="form-row">
-        <Field label="Amount (₹)" error={f.errors.amount}><input inputMode="decimal" value={f.values.amount} onChange={f.set('amount')} placeholder="0.00" autoFocus /></Field>
-        <Field label="Category" error={f.errors.category}><select value={f.values.category} onChange={f.set('category')}>{CATEGORIES.map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select></Field>
-      </div>
-      <Field label="Description" error={f.errors.description}><input maxLength={500} value={f.values.description} onChange={f.set('description')} placeholder="e.g. Weekly groceries" /></Field>
-      <div className="form-row">
-        <Field label="Merchant (optional)"><input maxLength={200} value={f.values.merchant} onChange={f.set('merchant')} placeholder="e.g. BigBazaar" /></Field>
-        <Field label="Date" error={f.errors.transaction_date}><input type="date" value={f.values.transaction_date} onChange={f.set('transaction_date')} /></Field>
-      </div>
-      <Actions busy={f.busy} onCancel={onCancel} label="Add transaction" />
-    </form>
+      <Row>
+        <TextField select label="Type" {...f.field('type')}>
+          <MenuItem value="debit">Expense (debit)</MenuItem>
+          <MenuItem value="credit">Income (credit)</MenuItem>
+        </TextField>
+        <TextField select label="Account" {...f.field('account_id')}>
+          {accounts.map((a) => <MenuItem key={a.id} value={a.id}>{a.account_name} ({a.account_type})</MenuItem>)}
+        </TextField>
+      </Row>
+      <Row>
+        <TextField label="Amount" placeholder="0.00" autoFocus slotProps={{ ...rupeeAdornment, htmlInput: { inputMode: 'decimal' } }} {...f.field('amount')} />
+        <TextField select label="Category" {...f.field('category')}>{options(CATEGORIES)}</TextField>
+      </Row>
+      <TextField label="Description" placeholder="e.g. Weekly groceries" slotProps={{ htmlInput: { maxLength: 500 } }} {...f.field('description')} />
+      <Row>
+        <TextField label="Merchant (optional)" placeholder="e.g. BigBazaar" slotProps={{ htmlInput: { maxLength: 200 } }} {...f.field('merchant')} />
+        <TextField label="Date" type="date" slotProps={dateField} {...f.field('transaction_date')} />
+      </Row>
+      <FormActions busy={f.busy} onCancel={onCancel} label="Add transaction" />
+    </FormBody>
   )
 }
 
@@ -122,20 +148,22 @@ export function TransferForm({ accounts, onSubmit, onCancel }) {
     }),
     (v) => onSubmit({ source_account_id: Number(v.source_account_id), destination_account_id: Number(v.destination_account_id), amount: Number(v.amount), description: v.description.trim(), transfer_date: v.transfer_date }),
   )
-  const opts = accounts.map((a) => <option key={a.id} value={a.id}>{a.account_name} — {formatINR(a.balance)}{a.account_type === 'credit' ? ' owed' : ''}</option>)
+  const opts = accounts.map((a) => <MenuItem key={a.id} value={a.id}>{a.account_name} — {formatINR(a.balance)}{a.account_type === 'credit' ? ' owed' : ''}</MenuItem>)
   return (
-    <form onSubmit={f.submit} noValidate>
-      <p className="muted">Moves money between your accounts, e.g. paying a credit card. Transfers are not counted as income or expenses.</p>
+    <FormBody onSubmit={f.submit}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Moves money between your accounts, e.g. paying a credit card. Transfers are not counted as income or expenses.
+      </Typography>
       <FormError message={f.formError} />
-      <Field label="From"><select value={f.values.source_account_id} onChange={f.set('source_account_id')}>{opts}</select></Field>
-      <Field label="To" error={f.errors.destination_account_id}><select value={f.values.destination_account_id} onChange={f.set('destination_account_id')}>{opts}</select></Field>
-      <div className="form-row">
-        <Field label="Amount (₹)" error={f.errors.amount}><input inputMode="decimal" value={f.values.amount} onChange={f.set('amount')} placeholder="0.00" autoFocus /></Field>
-        <Field label="Date"><input type="date" value={f.values.transfer_date} onChange={f.set('transfer_date')} /></Field>
-      </div>
-      <Field label="Description" error={f.errors.description}><input maxLength={500} value={f.values.description} onChange={f.set('description')} /></Field>
-      <Actions busy={f.busy} onCancel={onCancel} label="Transfer" />
-    </form>
+      <TextField select label="From" {...f.field('source_account_id')}>{opts}</TextField>
+      <TextField select label="To" {...f.field('destination_account_id')}>{opts}</TextField>
+      <Row>
+        <TextField label="Amount" placeholder="0.00" autoFocus slotProps={{ ...rupeeAdornment, htmlInput: { inputMode: 'decimal' } }} {...f.field('amount')} />
+        <TextField label="Date" type="date" slotProps={dateField} {...f.field('transfer_date')} />
+      </Row>
+      <TextField label="Description" slotProps={{ htmlInput: { maxLength: 500 } }} {...f.field('description')} />
+      <FormActions busy={f.busy} onCancel={onCancel} label="Transfer" />
+    </FormBody>
   )
 }
 
@@ -146,15 +174,15 @@ export function BudgetForm({ defaultMonth, defaultYear, onSubmit, onCancel }) {
     (v) => onSubmit({ category: v.category, monthly_limit: Number(v.monthly_limit), month: Number(v.month), year: Number(v.year) }),
   )
   return (
-    <form onSubmit={f.submit} noValidate>
+    <FormBody onSubmit={f.submit}>
       <FormError message={f.formError} />
-      <Field label="Category" hint="Salary is income only and cannot have a budget."><select value={f.values.category} onChange={f.set('category')}>{BUDGET_CATEGORIES.map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select></Field>
-      <Field label="Monthly limit (₹)" error={f.errors.monthly_limit}><input inputMode="decimal" value={f.values.monthly_limit} onChange={f.set('monthly_limit')} placeholder="10000" autoFocus /></Field>
-      <div className="form-row">
-        <Field label="Month"><select value={f.values.month} onChange={f.set('month')}>{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></Field>
-        <Field label="Year"><input type="number" min="2000" max="2100" value={f.values.year} onChange={f.set('year')} /></Field>
-      </div>
-      <Actions busy={f.busy} onCancel={onCancel} label="Save budget" />
-    </form>
+      <TextField select label="Category" {...f.field('category', 'Salary is income only and cannot have a budget.')}>{options(BUDGET_CATEGORIES)}</TextField>
+      <TextField label="Monthly limit" placeholder="10000" autoFocus slotProps={{ ...rupeeAdornment, htmlInput: { inputMode: 'decimal' } }} {...f.field('monthly_limit')} />
+      <Row>
+        <TextField select label="Month" {...f.field('month')}>{MONTHS.map((m, i) => <MenuItem key={m} value={i + 1}>{m}</MenuItem>)}</TextField>
+        <TextField label="Year" type="number" slotProps={{ htmlInput: { min: 2000, max: 2100 } }} {...f.field('year')} />
+      </Row>
+      <FormActions busy={f.busy} onCancel={onCancel} label="Save budget" />
+    </FormBody>
   )
 }

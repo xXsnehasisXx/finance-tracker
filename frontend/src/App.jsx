@@ -13,7 +13,7 @@ import { Spinner } from './components/ui.jsx'
 
 function Protected({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <Spinner label="Restoring session…" />
+  if (loading) return <Spinner label="Restoring session…" fullScreen />
   return user ? children : <Navigate to="/login" replace />
 }
 

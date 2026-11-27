@@ -1,44 +1,54 @@
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext.jsx'
+import { useCallback, useEffect, useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import { useMediaQuery } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+import Box from '@mui/material/Box'
+import Drawer from '@mui/material/Drawer'
+import AppHeader from '../components/layout/AppHeader.jsx'
+import Sidebar from '../components/layout/Sidebar.jsx'
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_STORAGE_KEY, SIDEBAR_WIDTH } from '../theme/themeConstants.js'
 
-const NAV = [
-  ['/', 'Dashboard', '📊'],
-  ['/accounts', 'Accounts', '🏦'],
-  ['/transactions', 'Transactions', '💸'],
-  ['/budgets', 'Budgets', '🎯'],
-  ['/analytics', 'Analytics', '📈'],
-  ['/assistant', 'AI Assistant', '🤖'],
-  ['/profile', 'Profile', '👤'],
-]
+const readCollapsed = () => {
+  try { return localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1' } catch { return false }
+}
 
 export default function AppLayout() {
-  const { user, logout } = useAuth()
-  const [open, setOpen] = useState(false)
+  const theme = useTheme()
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => { if (isDesktop) setMobileOpen(false) }, [isDesktop])
+
+  const toggle = useCallback(() => {
+    if (!isDesktop) return setMobileOpen((o) => !o)
+    setCollapsed((c) => {
+      try { localStorage.setItem(SIDEBAR_STORAGE_KEY, c ? '0' : '1') } catch { /* ignore */ }
+      return !c
+    })
+  }, [isDesktop])
+
+  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH
+  const menuLabel = isDesktop ? (collapsed ? 'Expand sidebar' : 'Collapse sidebar') : 'Open navigation menu'
+
   return (
-    <div className="shell">
-      <aside className={`sidebar ${open ? 'open' : ''}`}>
-        <div className="brand">💰 Finance Tracker</div>
-        <nav>
-          {NAV.map(([to, label, icon]) => (
-            <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span aria-hidden="true">{icon}</span> {label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          <div className="muted small">{user?.email}</div>
-          <button className="btn btn-ghost btn-block" onClick={logout}>Log out</button>
-        </div>
-      </aside>
-      {open && <div className="scrim" onClick={() => setOpen(false)} />}
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-          <span className="greeting">Hello, {user?.name?.split(' ')[0]}</span>
-        </header>
-        <main className="content"><Outlet /></main>
-      </div>
-    </div>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <Box component="aside" sx={{ display: { xs: 'none', md: 'block' }, width, flexShrink: 0, transition: theme.transitions.create('width', { duration: 200 }) }}>
+        <Drawer variant="permanent" open sx={{ '& .MuiDrawer-paper': { width, boxSizing: 'border-box', borderRight: 1, borderColor: 'divider', overflowX: 'hidden', transition: theme.transitions.create('width', { duration: 200 }) } }}>
+          <Sidebar collapsed={collapsed} />
+        </Drawer>
+      </Box>
+      <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)} ModalProps={{ keepMounted: true }}
+        sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, maxWidth: '85vw', boxSizing: 'border-box' } }}>
+        <Sidebar onNavigate={() => setMobileOpen(false)} />
+      </Drawer>
+
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <AppHeader onMenuClick={toggle} menuLabel={menuLabel} sidebarOpen={isDesktop ? !collapsed : mobileOpen} />
+        <Box component="main" sx={{ flex: 1, width: '100%', maxWidth: 1360, mx: 'auto', p: { xs: 2, sm: 3, lg: 4 }, minWidth: 0 }}>
+          <Outlet />
+        </Box>
+      </Box>
+    </Box>
   )
 }
